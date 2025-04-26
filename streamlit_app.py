@@ -10,7 +10,7 @@ st.set_page_config(page_title="Family Tree Explorer", page_icon="🌳", layout="
 # --- Load Family Tree Data ---
 @st.cache_data
 def load_data():
-    df = pd.read_excel('family_tree.xlsx')
+    df = pd.read_excel('Test_family_tree.xlsx')
 
     # Clean up spouse and children IDs
     df['Spouse Ids'] = df['Spouse Ids'].fillna('').apply(lambda x: [int(i.strip()) for i in str(x).split(';') if i.strip().isdigit()])
