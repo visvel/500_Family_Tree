@@ -2,7 +2,7 @@
 
 import streamlit as st
 import pandas as pd
-import graphviz
+from streamlit_agraph import agraph, Node, Edge, Config
 
 # --- Page Config ---
 st.set_page_config(page_title="Family Tree Explorer", page_icon="🌳", layout="wide")
@@ -25,36 +25,47 @@ family_dict = {int(row['Unique ID']): row for _, row in family_df.iterrows()}
 def get_person(uid):
     return family_dict.get(int(uid))
 
-def draw_tree(dot, uid, level, max_level):
-    person = get_person(uid)
-    if person is None or level > max_level:
+def build_family_graph(uid, level, max_level, nodes, edges, visited):
+    if level > max_level or uid in visited:
         return
 
-    label = person['Name']
-    dot.node(str(uid), label)
+    person = get_person(uid)
+    if person is None:
+        return
 
-    # Parents
-    for parent_type in ['Father ID', 'Mother ID']:
-        pid = person[parent_type]
-        if pd.notna(pid) and pid in family_dict:
-            parent = family_dict[pid]
-            dot.node(str(pid), parent['Name'])
-            dot.edge(str(pid), str(uid), label=parent_type.replace(' ID', ''))
+    visited.add(uid)
+
+    label = person['Name']
+    nodes.append(Node(id=str(uid), label=label, size=400, shape="box"))
+
+    # Father
+    father_id = person['Father ID']
+    if pd.notna(father_id) and father_id in family_dict:
+        father = family_dict[father_id]
+        nodes.append(Node(id=str(father_id), label=father['Name'], size=300, shape="box", color="lightblue"))
+        edges.append(Edge(source=str(father_id), target=str(uid), label="Father"))
+
+    # Mother
+    mother_id = person['Mother ID']
+    if pd.notna(mother_id) and mother_id in family_dict:
+        mother = family_dict[mother_id]
+        nodes.append(Node(id=str(mother_id), label=mother['Name'], size=300, shape="box", color="pink"))
+        edges.append(Edge(source=str(mother_id), target=str(uid), label="Mother"))
 
     # Spouse(s)
     for sid in person['Spouse Ids']:
         if sid in family_dict:
             spouse = family_dict[sid]
-            dot.node(str(sid), spouse['Name'])
-            dot.edge(str(uid), str(sid), label="Spouse")
+            nodes.append(Node(id=str(sid), label=spouse['Name'], size=300, shape="box", color="lightgreen"))
+            edges.append(Edge(source=str(uid), target=str(sid), label="Spouse"))
 
     # Children
     for cid in person['Children Ids']:
         if cid in family_dict:
             child = family_dict[cid]
-            dot.node(str(cid), child['Name'])
-            dot.edge(str(uid), str(cid), label="Child")
-            draw_tree(dot, cid, level+1, max_level)
+            nodes.append(Node(id=str(cid), label=child['Name'], size=300, shape="box"))
+            edges.append(Edge(source=str(uid), target=str(cid), label="Child"))
+            build_family_graph(cid, level+1, max_level, nodes, edges, visited)
 
 # --- Main App UI ---
 
@@ -127,9 +138,21 @@ else:
         st.sidebar.info(f"Generating Tree with Depth Level: {user_level}")
 
         # Build Graph
-        dot = graphviz.Digraph(comment=f"Family Tree of {root_person['Name']}")
-        draw_tree(dot, person_id, 0, user_level)
-        st.graphviz_chart(dot)
+        nodes = []
+        edges = []
+        visited = set()
+
+        build_family_graph(person_id, 0, user_level, nodes, edges, visited)
+
+        config = Config(width=1200,
+                        height=700,
+                        directed=True,
+                        hierarchical=True,
+                        physics=False,
+                        nodeHighlightBehavior=True,
+                        highlightColor="red")
+
+        agraph(nodes=nodes, edges=edges, config=config)
 
         st.success(f"Showing {user_level} generation levels for {root_person['Name']} 👨‍👩‍👦")
     else:
