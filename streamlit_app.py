@@ -10,7 +10,6 @@ st.set_page_config(page_title="Family Tree Explorer", page_icon="🌳", layout="
 # --- Load Family Tree Data ---
 @st.cache_data
 def load_data():
-    # Replace 'family_tree.xlsx' with your actual file name
     df = pd.read_excel('family_tree.xlsx')
 
     # Clean up spouse and children IDs
@@ -19,12 +18,12 @@ def load_data():
     return df
 
 family_df = load_data()
-family_dict = {row['Unique ID']: row for _, row in family_df.iterrows()}
+family_dict = {int(row['Unique ID']): row for _, row in family_df.iterrows()}
 
 # --- Helper Functions ---
 
 def get_person(uid):
-    return family_dict.get(uid)
+    return family_dict.get(int(uid))
 
 def draw_tree(dot, uid, level, max_level):
     person = get_person(uid)
@@ -61,16 +60,35 @@ def draw_tree(dot, uid, level, max_level):
 
 st.title("🌳 Family Tree Explorer")
 
+# Get parameters from URL
 query_params = st.query_params
-person_id = int(query_params.get('id', [0])[0])
-max_level = int(query_params.get('level', [2])[0])
+
+# Debug log: show raw query params
+st.sidebar.markdown("### 🔍 Debug Logs")
+st.sidebar.write("Received Query Parameters:", query_params)
+
+try:
+    person_id = int(query_params.get('id', [0])[0])
+except Exception as e:
+    st.sidebar.error(f"Error parsing person_id: {e}")
+    person_id = 0
+
+try:
+    max_level = int(query_params.get('level', [2])[0])
+except Exception as e:
+    st.sidebar.error(f"Error parsing level: {e}")
+    max_level = 2
+
+# Log received ID and level
+st.sidebar.write(f"Parsed ID: {person_id}")
+st.sidebar.write(f"Parsed Level: {max_level}")
 
 if person_id == 0:
     st.info("No person selected. Please provide a person ID in the URL.")
 else:
     root_person = get_person(person_id)
     if root_person:
-        # Show person mini-info
+        st.sidebar.success(f"Found Person: {root_person['Name']}")
         st.header(f"Family Tree of {root_person['Name']}")
         st.markdown(f"**Date of Birth:** {root_person['DOB'].date() if pd.notna(root_person['DOB']) else 'Unknown'}")
         st.markdown(f"**Valavu:** {root_person['Valavu']}")
@@ -80,11 +98,13 @@ else:
         # Let user pick the tree depth
         user_level = st.slider('Select depth of family tree expansion', 1, 5, value=max_level)
 
-        # Draw tree
+        st.sidebar.info(f"Generating Tree with Depth Level: {user_level}")
+
         dot = graphviz.Digraph(comment=f"Family Tree of {root_person['Name']}")
         draw_tree(dot, person_id, 0, user_level)
         st.graphviz_chart(dot)
 
         st.success(f"Showing {user_level} generation levels for {root_person['Name']} 👨‍👩‍👦")
     else:
+        st.sidebar.error(f"Person with ID {person_id} not found in dataset.")
         st.error("Person not found! Please check the ID.")
