@@ -25,7 +25,7 @@ family_dict = {int(row['Unique ID']): row for _, row in family_df.iterrows()}
 def get_person(uid):
     return family_dict.get(int(uid))
 
-def build_family_graph(uid, level, max_level, nodes, edges, visited):
+def build_family_graph(uid, level, max_level, nodes, edges, visited, visited_nodes):
     if level > max_level or uid in visited:
         return
 
@@ -35,37 +35,47 @@ def build_family_graph(uid, level, max_level, nodes, edges, visited):
 
     visited.add(uid)
 
-    label = person['Name']
-    nodes.append(Node(id=str(uid), label=label, size=400, shape="box"))
+    if uid not in visited_nodes:
+        label = person['Name']
+        nodes.append(Node(id=str(uid), label=label, size=400, shape="box"))
+        visited_nodes.add(uid)
 
     # Father
     father_id = person['Father ID']
     if pd.notna(father_id) and father_id in family_dict:
-        father = family_dict[father_id]
-        nodes.append(Node(id=str(father_id), label=father['Name'], size=300, shape="box", color="lightblue"))
+        if father_id not in visited_nodes:
+            father = family_dict[father_id]
+            nodes.append(Node(id=str(father_id), label=father['Name'], size=300, shape="box", color="lightblue"))
+            visited_nodes.add(father_id)
         edges.append(Edge(source=str(father_id), target=str(uid), label="Father"))
 
     # Mother
     mother_id = person['Mother ID']
     if pd.notna(mother_id) and mother_id in family_dict:
-        mother = family_dict[mother_id]
-        nodes.append(Node(id=str(mother_id), label=mother['Name'], size=300, shape="box", color="pink"))
+        if mother_id not in visited_nodes:
+            mother = family_dict[mother_id]
+            nodes.append(Node(id=str(mother_id), label=mother['Name'], size=300, shape="box", color="pink"))
+            visited_nodes.add(mother_id)
         edges.append(Edge(source=str(mother_id), target=str(uid), label="Mother"))
 
     # Spouse(s)
     for sid in person['Spouse Ids']:
         if sid in family_dict:
-            spouse = family_dict[sid]
-            nodes.append(Node(id=str(sid), label=spouse['Name'], size=300, shape="box", color="lightgreen"))
+            if sid not in visited_nodes:
+                spouse = family_dict[sid]
+                nodes.append(Node(id=str(sid), label=spouse['Name'], size=300, shape="box", color="lightgreen"))
+                visited_nodes.add(sid)
             edges.append(Edge(source=str(uid), target=str(sid), label="Spouse"))
 
     # Children
     for cid in person['Children Ids']:
         if cid in family_dict:
-            child = family_dict[cid]
-            nodes.append(Node(id=str(cid), label=child['Name'], size=300, shape="box"))
+            if cid not in visited_nodes:
+                child = family_dict[cid]
+                nodes.append(Node(id=str(cid), label=child['Name'], size=300, shape="box"))
+                visited_nodes.add(cid)
             edges.append(Edge(source=str(uid), target=str(cid), label="Child"))
-            build_family_graph(cid, level+1, max_level, nodes, edges, visited)
+            build_family_graph(cid, level+1, max_level, nodes, edges, visited, visited_nodes)
 
 # --- Main App UI ---
 
@@ -141,8 +151,9 @@ else:
         nodes = []
         edges = []
         visited = set()
+        visited_nodes = set()
 
-        build_family_graph(person_id, 0, user_level, nodes, edges, visited)
+        build_family_graph(person_id, 0, user_level, nodes, edges, visited, visited_nodes)
 
         config = Config(width=1200,
                         height=700,
