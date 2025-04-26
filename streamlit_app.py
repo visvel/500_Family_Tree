@@ -60,30 +60,42 @@ def draw_tree(dot, uid, level, max_level):
 
 st.title("🌳 Family Tree Explorer")
 
-# Get parameters from URL
+# --- Get Parameters from URL ---
 query_params = st.query_params
 
 # Debug log: show raw query params
 st.sidebar.markdown("### 🔍 Debug Logs")
 st.sidebar.write("Received Query Parameters:", query_params)
 
-# Correct and Safe Parsing
-id_param = query_params.get('id', [None])[0]
-level_param = query_params.get('level', [2])[0]
+# Initialize defaults
+person_id = 0
+max_level = 2
 
-try:
-    person_id = int(id_param) if id_param is not None else 0
-except Exception as e:
-    st.sidebar.error(f"Error parsing person_id: {e}")
-    person_id = 0
+# Parse person_id correctly
+if 'id' in query_params:
+    try:
+        id_list = query_params['id']
+        if isinstance(id_list, list):
+            person_id_str = ''.join(id_list)  # Join parts safely
+        else:
+            person_id_str = str(id_list)
+        person_id = int(person_id_str)
+    except Exception as e:
+        st.sidebar.error(f"Error parsing person_id: {e}")
 
-try:
-    max_level = int(level_param) if level_param is not None else 2
-except Exception as e:
-    st.sidebar.error(f"Error parsing level: {e}")
-    max_level = 2
+# Parse max_level correctly
+if 'level' in query_params:
+    try:
+        level_list = query_params['level']
+        if isinstance(level_list, list):
+            level_str = ''.join(level_list)
+        else:
+            level_str = str(level_list)
+        max_level = int(level_str)
+    except Exception as e:
+        st.sidebar.error(f"Error parsing level: {e}")
 
-# Log
+# Final debug print
 st.sidebar.write(f"Parsed ID: {person_id}")
 st.sidebar.write(f"Parsed Level: {max_level}")
 
