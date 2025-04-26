@@ -27,7 +27,7 @@ def get_person(uid):
 
 def draw_tree(dot, uid, level, max_level):
     person = get_person(uid)
-    if not person or level > max_level:
+    if person is None or level > max_level:
         return
 
     label = person['Name']
