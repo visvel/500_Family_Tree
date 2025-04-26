@@ -67,21 +67,27 @@ query_params = st.query_params
 st.sidebar.markdown("### 🔍 Debug Logs")
 st.sidebar.write("Received Query Parameters:", query_params)
 
+# Correct and Safe Parsing
+id_param = query_params.get('id', [None])[0]
+level_param = query_params.get('level', [2])[0]
+
 try:
-    person_id = int(query_params.get('id', [0])[0])
+    person_id = int(id_param) if id_param is not None else 0
 except Exception as e:
     st.sidebar.error(f"Error parsing person_id: {e}")
     person_id = 0
 
 try:
-    max_level = int(query_params.get('level', [2])[0])
+    max_level = int(level_param) if level_param is not None else 2
 except Exception as e:
     st.sidebar.error(f"Error parsing level: {e}")
     max_level = 2
 
-# Log received ID and level
+# Log
 st.sidebar.write(f"Parsed ID: {person_id}")
 st.sidebar.write(f"Parsed Level: {max_level}")
+
+# --- Main Logic ---
 
 if person_id == 0:
     st.info("No person selected. Please provide a person ID in the URL.")
@@ -90,16 +96,25 @@ else:
     if root_person:
         st.sidebar.success(f"Found Person: {root_person['Name']}")
         st.header(f"Family Tree of {root_person['Name']}")
-        st.markdown(f"**Date of Birth:** {root_person['DOB'].date() if pd.notna(root_person['DOB']) else 'Unknown'}")
-        st.markdown(f"**Valavu:** {root_person['Valavu']}")
-        alive_status = root_person['Is Alive?']
-        st.markdown(f"**Status:** {'🟢 Alive' if alive_status.lower() == 'yes' else '🔴 Deceased'}")
 
-        # Let user pick the tree depth
+        # Display basic details
+        if pd.notna(root_person['DOB']):
+            st.markdown(f"**Date of Birth:** {root_person['DOB'].date()}")
+        else:
+            st.markdown(f"**Date of Birth:** Unknown")
+        
+        st.markdown(f"**Valavu:** {root_person['Valavu']}")
+        
+        alive_status = root_person['Is Alive?']
+        status_text = '🟢 Alive' if isinstance(alive_status, str) and alive_status.strip().lower() == 'yes' else '🔴 Deceased'
+        st.markdown(f"**Status:** {status_text}")
+
+        # Let user pick tree depth
         user_level = st.slider('Select depth of family tree expansion', 1, 5, value=max_level)
 
         st.sidebar.info(f"Generating Tree with Depth Level: {user_level}")
 
+        # Build Graph
         dot = graphviz.Digraph(comment=f"Family Tree of {root_person['Name']}")
         draw_tree(dot, person_id, 0, user_level)
         st.graphviz_chart(dot)
