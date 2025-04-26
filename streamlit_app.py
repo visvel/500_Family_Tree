@@ -105,7 +105,7 @@ if person_id == 0:
     st.info("No person selected. Please provide a person ID in the URL.")
 else:
     root_person = get_person(person_id)
-    if root_person:
+    if root_person is not None:
         st.sidebar.success(f"Found Person: {root_person['Name']}")
         st.header(f"Family Tree of {root_person['Name']}")
 
