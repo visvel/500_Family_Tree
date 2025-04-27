@@ -110,20 +110,23 @@ else:
 
         nodes_json = json.dumps(orgchart_nodes)
 
-        # --- OrgChart.js Embed ---
+        # --- OrgChart.js Embed (jsDelivr CDN) ---
         components.html(f"""
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8" />
     <title>Family Tree</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/orgchart/2.1.9/js/orgchart.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/orgchart/2.1.9/css/orgchart.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/orgchart@2.1.9/dist/js/orgchart.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/orgchart@2.1.9/dist/css/orgchart.min.css" />
     <style>
       #tree {{
         width: 100%;
         height: 100%;
         overflow: auto;
+      }}
+      .orgchart {{
+        background: white;
       }}
     </style>
   </head>
