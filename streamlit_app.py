@@ -20,7 +20,7 @@ family_dict = {int(row['Unique ID']): row for _, row in family_df.iterrows()}
 # --- Helper Functions ---
 def get_person(uid):
     person = family_dict.get(int(uid))
-    if person:
+    if person is not None:
         st.sidebar.write(f"✅ Found person: {person['Name']} (ID: {uid})")
     else:
         st.sidebar.write(f"❌ Person with ID {uid} not found.")
@@ -71,6 +71,7 @@ st.sidebar.write("Received Query Parameters:", query_params)
 person_id = 0
 max_level = 2
 
+# --- Parse ID and Level ---
 if 'id' in query_params:
     try:
         id_list = query_params['id']
@@ -96,6 +97,7 @@ if 'level' in query_params:
 st.sidebar.write(f"Parsed ID: {person_id}")
 st.sidebar.write(f"Parsed Level: {max_level}")
 
+# --- Main Logic ---
 if person_id == 0:
     st.info("No person selected. Please provide a person ID in the URL (e.g., `?id=22`).")
 else:
