@@ -4,155 +4,174 @@ import pandas as pd
 # --- Page Config ---
 st.set_page_config(page_title="Family Tree Org Chart", page_icon="🌳", layout="wide")
 
-# --- Load Excel ---
+# --- Load Family Tree Data ---
 @st.cache_data
 def load_data():
-    return pd.read_excel("Test_family_tree.xlsx")
+    df = pd.read_excel('Test_family_tree.xlsx')
+    df['Spouse Ids'] = df['Spouse Ids'].fillna('').apply(lambda x: [int(i.strip()) for i in str(x).split(';') if i.strip().isdigit()])
+    df['Children Ids'] = df['Children Ids'].fillna('').apply(lambda x: [int(i.strip()) for i in str(x).split(';') if i.strip().isdigit()])
+    return df
 
-df = load_data()
+family_df = load_data()
+family_dict = {int(row['Unique ID']): row for _, row in family_df.iterrows()}
 
-# --- Mapping ---
-id_to_name = dict(zip(df['Unique ID'], df['Name']))
+# --- Helper Functions ---
+def get_person(uid):
+    return family_dict.get(int(uid))
 
-# --- Sidebar ---
-st.sidebar.title("Family Tree Organizational Chart")
-target_id = st.sidebar.number_input("Enter Unique ID:", min_value=1, step=1)
+def get_hover_info(person):
+    dob = person['DOB'].date() if pd.notna(person['DOB']) else 'Unknown'
+    valavu = person['Valavu'] if pd.notna(person['Valavu']) else 'Unknown'
+    alive = 'Alive' if isinstance(person['Is Alive?'], str) and person['Is Alive?'].strip().lower() == 'yes' else 'Deceased'
+    return f"Name: {person['Name']}<br>DOB: {dob}<br>Valavu: {valavu}<br>Status: {alive}"
 
-if target_id not in id_to_name:
-    st.warning("Please enter a valid ID from the tree!")
-    st.stop()
-
-# --- Build Tree ---
-
-def get_person_info(person_id):
-    if person_id not in id_to_name:
-        return None
-    return id_to_name.get(person_id, f"Unknown {person_id}")
-
-def build_html_tree(person_id, level_up=2, level_down=2):
-    """Recursive HTML Tree"""
-    person = df[df["Unique ID"] == person_id]
-    if person.empty:
-        return ""
-    person = person.iloc[0]
-
-    html = f'<li><a href="#">{get_person_info(person_id)}</a>'
-
-    # Children
-    children_html = ""
-    if level_down > 0:
-        children_ids = str(person.get("Children Ids") or "").split(";")
-        valid_children = []
-        for child_id in children_ids:
-            child_id = child_id.strip()
-            if child_id:
-                child_id = int(float(child_id))
-                if child_id in id_to_name:
-                    valid_children.append(child_id)
-
-        if valid_children:
-            children_html += "<ul>"
-            for child_id in valid_children:
-                children_html += build_html_tree(child_id, level_up=0, level_down=level_down-1)
-            children_html += "</ul>"
-
-    html += children_html
-    html += "</li>"
-
-    return html
-
-# --- Construct Top Level ---
-html_code = """
-<style>
-.tree ul {
-    padding-top: 20px; 
-    position: relative;
-    display: flex;
-    justify-content: center;
-}
-
-.tree li {
-    list-style-type: none;
-    text-align: center;
-    position: relative;
-    padding: 20px 5px 0 5px;
-}
-
-.tree li::before, .tree li::after {
-    content: '';
-    position: absolute; 
-    top: 0; 
-    border-top: 1px solid #ccc;
-}
-
-.tree li::before {
-    left: 50%;
-    border-left: 1px solid #ccc;
-    height: 20px;
-}
-
-.tree li::after {
-    right: 50%;
-    border-right: 1px solid #ccc;
-    height: 20px;
-}
-
-.tree li:only-child::before, .tree li:only-child::after {
-    display: none;
-}
-
-.tree li:only-child {
-    padding-top: 0;
-}
-
-.tree li a {
-    display: inline-block;
-    padding: 8px 15px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    text-decoration: none;
-    background-color: #e6f7ff;
-    color: #333;
-    font-family: Arial;
-}
-</style>
-
-<div class="tree">
-<ul>
-"""
-
-# Add Ancestors first
-def build_ancestor_tree(person_id, level_up):
-    if level_up == 0 or person_id not in id_to_name:
-        return f"<li><a href='#'>{get_person_info(person_id)}</a></li>"
-
-    person = df[df["Unique ID"] == person_id]
-    if person.empty:
+def build_html_tree(uid, level, max_level, visited):
+    if level > max_level or uid in visited:
         return ""
 
-    person = person.iloc[0]
-    father_id = person.get("Father ID")
-    mother_id = person.get("Mother ID")
+    person = get_person(uid)
+    if person is None:
+        return ""
 
-    html = "<li>"
-    html += f"<a href='#'>{get_person_info(person_id)}</a>"
+    visited.add(uid)
+    hover_info = get_hover_info(person)
 
-    if not pd.isna(father_id) or not pd.isna(mother_id):
+    html = f"<li><a title='{hover_info}' href='#'>{person['Name']}</a>"
+
+    children = []
+    for cid in person['Children Ids']:
+        if cid in family_dict:
+            children.append(cid)
+
+    if children:
         html += "<ul>"
-        if not pd.isna(father_id):
-            html += build_ancestor_tree(int(father_id), level_up-1)
-        if not pd.isna(mother_id):
-            html += build_ancestor_tree(int(mother_id), level_up-1)
+        for child_id in children:
+            html += build_html_tree(child_id, level + 1, max_level, visited)
         html += "</ul>"
 
     html += "</li>"
 
     return html
 
-# Build the complete tree
-html_code += build_ancestor_tree(target_id, level_up=2)
-html_code += "<ul>" + build_html_tree(target_id, level_up=0, level_down=2) + "</ul>"
-html_code += "</ul></div>"
+# --- Main App UI ---
+st.title("🌳 Family Tree Organizational Chart")
 
-# --- Render HTML ---
-st.markdown(html_code, unsafe_allow_html=True)
+query_params = st.query_params
+st.sidebar.markdown("### 🔍 Debug Logs")
+st.sidebar.write("Received Query Parameters:", query_params)
+
+person_id = 0
+max_level = 2
+
+if 'id' in query_params:
+    try:
+        id_list = query_params['id']
+        if isinstance(id_list, list):
+            person_id_str = ''.join(id_list)
+        else:
+            person_id_str = str(id_list)
+        person_id = int(person_id_str)
+    except Exception as e:
+        st.sidebar.error(f"Error parsing person_id: {e}")
+
+if 'level' in query_params:
+    try:
+        level_list = query_params['level']
+        if isinstance(level_list, list):
+            level_str = ''.join(level_list)
+        else:
+            level_str = str(level_list)
+        max_level = int(level_str)
+    except Exception as e:
+        st.sidebar.error(f"Error parsing level: {e}")
+
+st.sidebar.write(f"Parsed ID: {person_id}")
+st.sidebar.write(f"Parsed Level: {max_level}")
+
+if person_id == 0:
+    st.info("No person selected. Please provide a person ID in the URL.")
+else:
+    root_person = get_person(person_id)
+    if root_person is not None:
+        st.sidebar.success(f"Found Person: {root_person['Name']}")
+        st.header(f"Family Tree of {root_person['Name']}")
+
+        if pd.notna(root_person['DOB']):
+            st.markdown(f"**Date of Birth:** {root_person['DOB'].date()}")
+        else:
+            st.markdown(f"**Date of Birth:** Unknown")
+        
+        st.markdown(f"**Valavu:** {root_person['Valavu']}")
+        
+        alive_status = root_person['Is Alive?']
+        status_text = '🟢 Alive' if isinstance(alive_status, str) and alive_status.strip().lower() == 'yes' else '🔴 Deceased'
+        st.markdown(f"**Status:** {status_text}")
+
+        user_level = st.slider('Select depth of family tree expansion', 1, 5, value=max_level)
+        st.sidebar.info(f"Generating Tree with Depth Level: {user_level}")
+
+        visited = set()
+
+        # --- Build OrgChart Style HTML ---
+        tree_html = """
+        <style>
+        .tree * {margin:0; padding:0;}
+        .tree ul {
+            padding-top: 20px; position: relative;
+            display: flex;
+            justify-content: center;
+        }
+        .tree li {
+            list-style-type: none;
+            text-align: center;
+            position: relative;
+            padding: 20px 5px 0 5px;
+        }
+        .tree li::before, .tree li::after {
+            content: '';
+            position: absolute; 
+            top: 0; 
+            border-top: 1px solid #ccc;
+        }
+        .tree li::before {
+            left: 50%;
+            border-left: 1px solid #ccc;
+            height: 20px;
+        }
+        .tree li::after {
+            right: 50%;
+            border-right: 1px solid #ccc;
+            height: 20px;
+        }
+        .tree li:only-child::before, .tree li:only-child::after {
+            display: none;
+        }
+        .tree li a {
+            display: inline-block;
+            padding: 8px 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background: #e6f7ff;
+            text-decoration: none;
+            color: #333;
+            font-family: Arial, sans-serif;
+        }
+        .tree li a:hover {
+            background: #cceeff;
+            color: #000;
+        }
+        </style>
+
+        <div class="tree">
+            <ul>
+        """
+
+        tree_html += build_html_tree(person_id, 0, user_level, visited)
+        tree_html += "</ul></div>"
+
+        st.markdown(tree_html, unsafe_allow_html=True)
+
+        st.success(f"Showing {user_level} generation levels for {root_person['Name']} 👨‍👩‍👦")
+    else:
+        st.sidebar.error(f"Person with ID {person_id} not found in dataset.")
+        st.error("Person not found! Please check the ID.")
