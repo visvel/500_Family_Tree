@@ -19,14 +19,26 @@ family_dict = {int(row['Unique ID']): row for _, row in family_df.iterrows()}
 
 # --- Helper Functions ---
 def get_person(uid):
-    return family_dict.get(int(uid))
+    person = family_dict.get(int(uid))
+    if person:
+        st.sidebar.write(f"✅ Found person: {person['Name']} (ID: {uid})")
+    else:
+        st.sidebar.write(f"❌ Person with ID {uid} not found.")
+    return person
 
 def build_family_tree(uid, level, max_level, visited):
-    if level > max_level or uid in visited:
+    st.sidebar.write(f"🔵 Building node for ID {uid}, Level {level}")
+    if level > max_level:
+        st.sidebar.write(f"⏹️ Max level reached for ID {uid}")
+        return None
+
+    if uid in visited:
+        st.sidebar.write(f"⛔ Already visited ID {uid}")
         return None
 
     person = get_person(uid)
     if person is None:
+        st.sidebar.write(f"❌ Cannot build node: person {uid} missing.")
         return None
 
     visited.add(uid)
@@ -37,12 +49,17 @@ def build_family_tree(uid, level, max_level, visited):
             subtree = build_family_tree(cid, level+1, max_level, visited)
             if subtree:
                 children.append(subtree)
+        else:
+            st.sidebar.write(f"⚠️ Child ID {cid} for parent ID {uid} not found in family_dict")
 
-    return {
+    node = {
         "id": str(uid),
         "label": person['Name'],
         "children": children
     }
+    st.sidebar.write(f"✅ Node built for ID {uid}: {node}")
+
+    return node
 
 # --- Main App ---
 st.title("🌳 Family Tree Organizational Chart (React Look)")
@@ -63,7 +80,7 @@ if 'id' in query_params:
             person_id_str = str(id_list)
         person_id = int(person_id_str)
     except Exception as e:
-        st.sidebar.error(f"Error parsing person_id: {e}")
+        st.sidebar.error(f"❌ Error parsing person_id: {e}")
 
 if 'level' in query_params:
     try:
@@ -74,7 +91,7 @@ if 'level' in query_params:
             level_str = str(level_list)
         max_level = int(level_str)
     except Exception as e:
-        st.sidebar.error(f"Error parsing level: {e}")
+        st.sidebar.error(f"❌ Error parsing level: {e}")
 
 st.sidebar.write(f"Parsed ID: {person_id}")
 st.sidebar.write(f"Parsed Level: {max_level}")
@@ -84,7 +101,7 @@ if person_id == 0:
 else:
     root_person = get_person(person_id)
     if root_person is not None:
-        st.sidebar.success(f"Found Person: {root_person['Name']}")
+        st.sidebar.success(f"🎯 Found Root Person: {root_person['Name']}")
         st.header(f"Family Tree of {root_person['Name']}")
 
         if pd.notna(root_person['DOB']):
@@ -102,11 +119,14 @@ else:
         st.sidebar.info(f"Generating Tree with Depth Level: {user_level}")
 
         visited = set()
+        st.sidebar.write(f"🚀 Starting Tree Build for ID {person_id}")
         tree_data = build_family_tree(person_id, 0, user_level, visited)
 
         if not tree_data:
-            st.error("Could not generate tree data. No valid hierarchy.")
+            st.error("❌ Could not generate tree data. No valid hierarchy.")
             st.stop()
+        else:
+            st.sidebar.success("✅ Tree Data Built Successfully.")
 
         chart_json = json.dumps(tree_data)
 
@@ -170,7 +190,7 @@ else:
 </html>
 """, height=800, width=1500)
 
-        st.success(f"Showing {user_level} generation levels for {root_person['Name']} 👨‍👩‍👦")
+        st.success(f"✅ Showing {user_level} generation levels for {root_person['Name']} 👨‍👩‍👦")
     else:
-        st.sidebar.error(f"Person with ID {person_id} not found in dataset.")
+        st.sidebar.error(f"❌ Person with ID {person_id} not found in dataset.")
         st.error("Person not found! Please check the ID.")
