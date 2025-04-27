@@ -4,7 +4,7 @@ import json
 import streamlit.components.v1 as components
 
 # --- Page Config ---
-st.set_page_config(page_title="Family Tree OrgChart", page_icon="🌳", layout="wide")
+st.set_page_config(page_title="Family Tree Explorer", page_icon="🌳", layout="wide")
 
 # --- Load Family Tree Data ---
 @st.cache_data
@@ -19,41 +19,32 @@ family_dict = {int(row['Unique ID']): row for _, row in family_df.iterrows()}
 
 # --- Helper Functions ---
 def get_person(uid):
-    person = family_dict.get(int(uid))
-    if person is not None:
-        st.sidebar.write(f"✅ Found person: {person['Name']} (ID: {uid})")
-    else:
-        st.sidebar.write(f"❌ Person with ID {uid} not found.")
-    return person
+    return family_dict.get(int(uid))
 
-def build_orgchart_nodes(uid, level, max_level, visited):
-    st.sidebar.write(f"🔵 Building OrgChart node for ID {uid}, Level {level}")
-    if level > max_level:
-        return []
-
-    if uid in visited:
-        return []
+def build_html_tree(uid, level, max_level, visited):
+    if level > max_level or uid in visited:
+        return ""
 
     person = get_person(uid)
     if person is None:
-        return []
+        return ""
 
     visited.add(uid)
 
-    nodes = [{
-        "id": str(uid),
-        "name": person['Name'],
-        "title": f"Valavu: {person['Valavu']}" if pd.notna(person['Valavu']) else "Unknown Valavu",
-        "pid": str(person['Father ID']) if pd.notna(person['Father ID']) else None
-    }]
+    html = f"<li><span>{person['Name']}</span>"
 
+    children_html = ""
     for cid in person['Children Ids']:
-        nodes += build_orgchart_nodes(cid, level+1, max_level, visited)
+        children_html += build_html_tree(cid, level+1, max_level, visited)
 
-    return nodes
+    if children_html:
+        html += f"<ul>{children_html}</ul>"
+
+    html += "</li>"
+    return html
 
 # --- Main App ---
-st.title("🌳 Family Tree (OrgChart.js Style)")
+st.title("🌳 Family Tree Explorer (Pure HTML Tree)")
 
 query_params = st.query_params
 st.sidebar.markdown("### 🔍 Debug Logs")
@@ -99,63 +90,86 @@ else:
         st.sidebar.info(f"Generating Tree with Depth Level: {user_level}")
 
         visited = set()
-        st.sidebar.write(f"🚀 Starting Tree Node Building for ID {person_id}")
-        orgchart_nodes = build_orgchart_nodes(person_id, 0, user_level, visited)
+        tree_html = build_html_tree(person_id, 0, user_level, visited)
 
-        if not orgchart_nodes:
-            st.error("❌ Could not generate tree nodes. No valid hierarchy.")
+        if not tree_html:
+            st.error("❌ Could not generate tree structure.")
             st.stop()
-        else:
-            st.sidebar.success("✅ OrgChart Nodes Built Successfully.")
 
-        nodes_json = json.dumps(orgchart_nodes)
-
-        # --- OrgChart.js Embed (jsDelivr CDN) ---
-        components.html(f"""
+        final_html = f"""
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>Family Tree</title>
-    <script src="https://cdn.jsdelivr.net/npm/orgchart@2.1.9/dist/js/orgchart.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/orgchart@2.1.9/dist/css/orgchart.min.css" />
-    <style>
-      #tree {{
-        width: 100%;
-        height: 100%;
-        overflow: auto;
-      }}
-      .orgchart {{
-        background: white;
-      }}
-    </style>
-  </head>
-  <body>
-    <div id="tree"></div>
+<head>
+<style>
+.tree ul {{
+  padding-top: 20px;
+  position: relative;
+  transition: all 0.5s;
+  display: table;
+  margin: 0 auto;
+}}
 
-    <script>
-      document.addEventListener('DOMContentLoaded', function () {{
-        const nodes = {nodes_json};
-        console.log("📦 OrgChart Nodes:", nodes);
+.tree li {{
+  display: table-cell;
+  text-align: center;
+  position: relative;
+  padding: 20px 5px 0 5px;
+  vertical-align: top;
+}}
 
-        const orgchart = new OrgChart(document.getElementById('tree'), {{
-          nodes: nodes,
-          nodeBinding: {{
-            field_0: "name",
-            field_1: "title"
-          }},
-          enableZoom: true,
-          enablePan: true,
-          scaleInitial: OrgChart.match.boundary
-        }});
+.tree li::before, .tree li::after {{
+  content: '';
+  position: absolute;
+  top: 0;
+  border-top: 2px solid #ccc;
+  width: 50%;
+  height: 20px;
+}}
 
-        console.log("✅ OrgChart Rendered Successfully!");
-      }});
-    </script>
-  </body>
+.tree li::before {{
+  left: 50%;
+  border-left: 2px solid #ccc;
+}}
+
+.tree li::after {{
+  right: 50%;
+  border-right: 2px solid #ccc;
+}}
+
+.tree li:only-child::before, .tree li:only-child::after {{
+  display: none;
+}}
+
+.tree li:only-child {{
+  padding-top: 0;
+}}
+
+.tree li span {{
+  border: 2px solid #4CAF50;
+  padding: 5px 10px;
+  border-radius: 8px;
+  display: inline-block;
+  background: #e6ffe6;
+  font-family: Arial;
+  font-size: 14px;
+  color: #333;
+  position: relative;
+  top: 0;
+}}
+
+</style>
+</head>
+<body>
+<div class="tree">
+<ul>
+{tree_html}
+</ul>
+</div>
+</body>
 </html>
-""", height=800, width=1500)
+"""
 
+        components.html(final_html, height=800, scrolling=True)
         st.success(f"✅ Showing {user_level} generation levels for {root_person['Name']} 👨‍👩‍👦")
     else:
         st.sidebar.error(f"❌ Person with ID {person_id} not found in dataset.")
