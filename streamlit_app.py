@@ -169,6 +169,8 @@ else:
     <script>
       const {{ OrganizationalChart, TreeNode }} = window['react-organizational-chart'];
 
+      const root = {chart_json};
+
       function generateTree(node) {{
         if (!node) return null;
         return React.createElement(
@@ -178,12 +180,10 @@ else:
         );
       }}
 
-      const root = generateTree({chart_json});
-
       const tree = React.createElement(
         OrganizationalChart,
-        {{ label: React.createElement('div', {{ className: 'node' }}, "{root_person['Name']}") }},
-        root
+        {{ label: React.createElement('div', {{ className: 'node' }}, root.label) }},
+        ...(root.children || []).map(child => generateTree(child))
       );
 
       ReactDOM.createRoot(document.getElementById('tree')).render(tree);
