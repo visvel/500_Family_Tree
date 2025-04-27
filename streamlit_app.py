@@ -31,19 +31,18 @@ def build_family_tree(uid, level, max_level, visited):
 
     visited.add(uid)
 
-    node = {
-        "id": str(uid),
-        "label": person['Name'],
-        "children": []
-    }
-
+    children = []
     for cid in person['Children Ids']:
         if cid in family_dict:
-            child_subtree = build_family_tree(cid, level+1, max_level, visited)
-            if child_subtree:
-                node['children'].append(child_subtree)
+            subtree = build_family_tree(cid, level+1, max_level, visited)
+            if subtree:
+                children.append(subtree)
 
-    return node
+    return {
+        "id": str(uid),
+        "label": person['Name'],
+        "children": children
+    }
 
 # --- Main App ---
 st.title("🌳 Family Tree Organizational Chart (React Look)")
@@ -105,6 +104,10 @@ else:
         visited = set()
         tree_data = build_family_tree(person_id, 0, user_level, visited)
 
+        if not tree_data:
+            st.error("Could not generate tree data. No valid hierarchy.")
+            st.stop()
+
         chart_json = json.dumps(tree_data)
 
         # --- React Organizational Chart Embed ---
@@ -153,13 +156,15 @@ else:
         );
       }}
 
-      const root = React.createElement(
+      const root = generateTree({chart_json});
+
+      const tree = React.createElement(
         OrganizationalChart,
         {{ label: React.createElement('div', {{ className: 'node' }}, "{root_person['Name']}") }},
-        generateTree({chart_json})
+        root
       );
 
-      ReactDOM.createRoot(document.getElementById('tree')).render(root);
+      ReactDOM.createRoot(document.getElementById('tree')).render(tree);
     </script>
   </body>
 </html>
