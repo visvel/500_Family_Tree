@@ -169,10 +169,17 @@ else:
     <script>
       const {{ OrganizationalChart, TreeNode }} = window['react-organizational-chart'];
 
+      console.log("📦 Parsing root JSON...");
       const root = JSON.parse(`{chart_json}`);
+      console.log("✅ Root JSON:", root);
 
       function generateTree(node) {{
-        if (!node) return null;
+        if (!node) {{
+          console.log("⚠️ Empty node found, returning null");
+          return null;
+        }}
+        console.log("🔵 Generating node:", node.label);
+
         return React.createElement(
           TreeNode,
           {{ label: React.createElement('div', {{ className: 'node' }}, node.label) }},
@@ -180,13 +187,17 @@ else:
         );
       }}
 
+      console.log("🚀 Building full organizational chart...");
+
       const tree = React.createElement(
         OrganizationalChart,
         {{ label: React.createElement('div', {{ className: 'node' }}, root.label) }},
         ...(root.children || []).map(child => generateTree(child))
       );
 
+      console.log("✅ Tree structure created. Rendering now...");
       ReactDOM.createRoot(document.getElementById('tree')).render(tree);
+      console.log("✅ Render complete!");
     </script>
   </body>
 </html>
