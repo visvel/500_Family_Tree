@@ -81,7 +81,7 @@ st.sidebar.write(f"Parsed ID: {person_id}")
 st.sidebar.write(f"Parsed Level: {max_level}")
 
 if person_id == 0:
-    st.info("No person selected. Please provide a person ID in the URL.")
+    st.info("No person selected. Please provide a person ID in the URL (e.g., `?id=22`).")
 else:
     root_person = get_person(person_id)
     if root_person is not None:
@@ -105,10 +105,9 @@ else:
         visited = set()
         tree_data = build_family_tree(person_id, 0, user_level, visited)
 
-        # Pass this to React Org Chart
         chart_json = json.dumps(tree_data)
 
-        # --- Load React Organizational Chart ---
+        # --- React Organizational Chart Embed ---
         components.html(f"""
 <!DOCTYPE html>
 <html>
@@ -116,20 +115,22 @@ else:
     <meta charset="UTF-8" />
     <title>Family Tree</title>
     <style>
-      .node {
+      .node {{
         border: 1px solid #ccc;
-        padding: 5px 10px;
+        padding: 8px 15px;
         border-radius: 8px;
         background: #e6f7ff;
         display: inline-block;
-      }
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+      }}
       .node:hover {{
         background: #cceeff;
         color: #000;
       }}
       .tree-container {{
         width: 100%;
-        overflow: scroll;
+        overflow: auto;
       }}
     </style>
   </head>
