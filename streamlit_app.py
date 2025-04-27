@@ -169,7 +169,7 @@ else:
     <script>
       const {{ OrganizationalChart, TreeNode }} = window['react-organizational-chart'];
 
-      const root = {chart_json};
+      const root = JSON.parse(`{chart_json}`);
 
       function generateTree(node) {{
         if (!node) return null;
