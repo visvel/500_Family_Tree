@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import json
+import streamlit.components.v1 as components
 
 # --- Page Config ---
 st.set_page_config(page_title="Family Tree Org Chart", page_icon="🌳", layout="wide")
@@ -19,42 +21,32 @@ family_dict = {int(row['Unique ID']): row for _, row in family_df.iterrows()}
 def get_person(uid):
     return family_dict.get(int(uid))
 
-def get_hover_info(person):
-    dob = person['DOB'].date() if pd.notna(person['DOB']) else 'Unknown'
-    valavu = person['Valavu'] if pd.notna(person['Valavu']) else 'Unknown'
-    alive = 'Alive' if isinstance(person['Is Alive?'], str) and person['Is Alive?'].strip().lower() == 'yes' else 'Deceased'
-    return f"Name: {person['Name']}<br>DOB: {dob}<br>Valavu: {valavu}<br>Status: {alive}"
-
-def build_html_tree(uid, level, max_level, visited):
+def build_family_tree(uid, level, max_level, visited):
     if level > max_level or uid in visited:
-        return ""
+        return None
 
     person = get_person(uid)
     if person is None:
-        return ""
+        return None
 
     visited.add(uid)
-    hover_info = get_hover_info(person)
 
-    html = f"<li><a title='{hover_info}' href='#'>{person['Name']}</a>"
+    node = {
+        "id": str(uid),
+        "label": person['Name'],
+        "children": []
+    }
 
-    children = []
     for cid in person['Children Ids']:
         if cid in family_dict:
-            children.append(cid)
+            child_subtree = build_family_tree(cid, level+1, max_level, visited)
+            if child_subtree:
+                node['children'].append(child_subtree)
 
-    if children:
-        html += "<ul>"
-        for child_id in children:
-            html += build_html_tree(child_id, level + 1, max_level, visited)
-        html += "</ul>"
+    return node
 
-    html += "</li>"
-
-    return html
-
-# --- Main App UI ---
-st.title("🌳 Family Tree Organizational Chart")
+# --- Main App ---
+st.title("🌳 Family Tree Organizational Chart (React Look)")
 
 query_params = st.query_params
 st.sidebar.markdown("### 🔍 Debug Logs")
@@ -111,65 +103,66 @@ else:
         st.sidebar.info(f"Generating Tree with Depth Level: {user_level}")
 
         visited = set()
+        tree_data = build_family_tree(person_id, 0, user_level, visited)
 
-        # --- Build OrgChart Style HTML ---
-        tree_html = """
-        <style>
-        .tree * {margin:0; padding:0;}
-        .tree ul {
-            padding-top: 20px; position: relative;
-            display: flex;
-            justify-content: center;
-        }
-        .tree li {
-            list-style-type: none;
-            text-align: center;
-            position: relative;
-            padding: 20px 5px 0 5px;
-        }
-        .tree li::before, .tree li::after {
-            content: '';
-            position: absolute; 
-            top: 0; 
-            border-top: 1px solid #ccc;
-        }
-        .tree li::before {
-            left: 50%;
-            border-left: 1px solid #ccc;
-            height: 20px;
-        }
-        .tree li::after {
-            right: 50%;
-            border-right: 1px solid #ccc;
-            height: 20px;
-        }
-        .tree li:only-child::before, .tree li:only-child::after {
-            display: none;
-        }
-        .tree li a {
-            display: inline-block;
-            padding: 8px 15px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            background: #e6f7ff;
-            text-decoration: none;
-            color: #333;
-            font-family: Arial, sans-serif;
-        }
-        .tree li a:hover {
-            background: #cceeff;
-            color: #000;
-        }
-        </style>
+        # Pass this to React Org Chart
+        chart_json = json.dumps(tree_data)
 
-        <div class="tree">
-            <ul>
-        """
+        # --- Load React Organizational Chart ---
+        components.html(f"""
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Family Tree</title>
+    <style>
+      .node {
+        border: 1px solid #ccc;
+        padding: 5px 10px;
+        border-radius: 8px;
+        background: #e6f7ff;
+        display: inline-block;
+      }
+      .node:hover {{
+        background: #cceeff;
+        color: #000;
+      }}
+      .tree-container {{
+        width: 100%;
+        overflow: scroll;
+      }}
+    </style>
+  </head>
+  <body>
+    <div id="tree" class="tree-container"></div>
 
-        tree_html += build_html_tree(person_id, 0, user_level, visited)
-        tree_html += "</ul></div>"
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/react-organizational-chart/dist/index.js"></script>
 
-        st.markdown(tree_html, unsafe_allow_html=True)
+    <script>
+      const {{ OrganizationalChart, TreeNode }} = window['react-organizational-chart'];
+
+      function generateTree(node) {{
+        if (!node) return null;
+        return React.createElement(
+          TreeNode,
+          {{ label: React.createElement('div', {{ className: 'node' }}, node.label) }},
+          ...(node.children || []).map(child => generateTree(child))
+        );
+      }}
+
+      const root = React.createElement(
+        OrganizationalChart,
+        {{ label: React.createElement('div', {{ className: 'node' }}, "{root_person['Name']}") }},
+        generateTree({chart_json})
+      );
+
+      ReactDOM.createRoot(document.getElementById('tree')).render(root);
+    </script>
+  </body>
+</html>
+""", height=800, width=1500)
 
         st.success(f"Showing {user_level} generation levels for {root_person['Name']} 👨‍👩‍👦")
     else:
